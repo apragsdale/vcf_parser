@@ -115,9 +115,19 @@ def count_genotypes(gt, multiallelic=False, anc_idx=0):
             + 2 * gt.count("1/1")
             + 2 * gt.count("1|1")
         )
+        n_hap = 2 * (
+            gt.count("0/0")
+            + gt.count("0|0")
+            + gt.count("0/1")
+            + gt.count("0|1")
+            + gt.count("1/0")
+            + gt.count("1|0")
+            + gt.count("1/1")
+            + gt.count("1|1")
+        )
         if anc_idx == 1:
-            ac = 2 * len(gt) - ac
-    return ac
+            ac = n_hap - ac
+    return ac, n_hap
 
 
 if __name__ == "__main__":
@@ -172,7 +182,7 @@ if __name__ == "__main__":
     match_alt = 0
     skipped_multi = 0
 
-    allele_counts = defaultdict(int)
+    allele_counts = defaultdict(lambda: defaultdict(int))
 
     with open_func(fin, "rb") as f:
         for line in f:
@@ -220,18 +230,19 @@ if __name__ == "__main__":
                     match_ref = 1
                     anc_idx = 0
 
-                acs = tuple(
-                    [
-                        count_genotypes(
-                            get_pop_genotypes(lsplit, pop_cols[p]),
-                            multiallelic=args.keep_multiallelic,
-                            anc_idx=anc_idx,
-                        )
-                        for p in pops
-                    ]
-                )
+                acs_ns = [
+                    count_genotypes(
+                        get_pop_genotypes(lsplit, pop_cols[p]),
+                        multiallelic=args.keep_multiallelic,
+                        anc_idx=anc_idx,
+                    )
+                    for p in pops
+                ]
 
-                allele_counts[acs] += 1
+                acs = tuple([_[0] for _ in acs_ns])
+                ns = tuple([_[1] for _ in acs_ns])
+
+                allele_counts[ns][acs] += 1
 
                 pos_kept += 1
                 if args.verbose is not None:
@@ -239,7 +250,7 @@ if __name__ == "__main__":
                         print(f"kept {pos_kept} sites, at position {pos}")
 
     data = {}
-    data["allele_counts"] = allele_counts
+    data["allele_counts"] = dict(allele_counts)
     data["stats"] = {
         "kept": pos_kept,
         "no_match": no_match,
